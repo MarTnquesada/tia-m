@@ -12,7 +12,7 @@ NEWS READERS MATRIX
 (pos 0 represents newspaper 1 and so on)
 """
 NEWS_READERS = [[10, 15, 25, 12, 22, 66, 25, 35, 50, 12],
-                [18, 20, 15, 30, 15, 10, 14 ,50, 30, 15],
+                [18, 20, 15, 30, 15, 10, 14, 50, 30, 15],
                 [20, 30, 10, 30, 55, 12, 40, 15, 12, 18],
                 [45, 45, 44, 15, 18, 15, 25, 10, 25, 20],
                 [15, 12, 15, 22, 20, 20, 28, 18, 22, 20],
@@ -35,23 +35,22 @@ def init_individual(icls, shape):
     """
 
     relative_order = numpy.array([numpy.random.permutation(range(0, shape[1])) for i in range(0, shape[0])])
-    individual = numpy.zeros((shape[0], shape[1]))
+    individual = numpy.full((shape[0], shape[1]), numpy.NINF, dtype=int)
     # create final timeline, randomizing initial priority
-    for resource in numpy.random.permutation([r for r in range(0, shape[1])]):
+    for order in numpy.random.permutation([r for r in range(0, shape[1])]):
         for consumer in numpy.random.permutation([c for c in range(0, shape[0])]):
-            resource_order = relative_order[consumer][resource]
+            resource = relative_order[consumer][order]
             previous_resource = None
-            if resource_order > 0:
-                for r in relative_order[consumer]:
-                    if r == resource_order - 1:
-                        previous_resource = r
-                        break
+            if order > 0:
+                previous_resource = relative_order[consumer][order - 1]
+
             projected_start_time = 0 if previous_resource is None else individual[consumer][previous_resource] + NEWS_READERS[consumer][previous_resource]
             projected_end_time = projected_start_time + NEWS_READERS[consumer][resource]
             for c2 in range(0, shape[0]):
-                if (projected_start_time >= individual[c2][resource] and projected_end_time <= individual[c2][resource] + )
-                    or ()
-
+                if individual[c2][resource] <= projected_start_time < individual[c2][resource] + NEWS_READERS[c2][resource] or \
+                        individual[c2][resource] < projected_end_time <= individual[c2][resource] + NEWS_READERS[c2][resource] or \
+                        individual[c2][resource] >= projected_start_time and projected_end_time >= individual[c2][resource] + NEWS_READERS[c2][resource]:
+                    projected_start_time = individual[c2][resource] + NEWS_READERS[c2][resource]
 
             individual[consumer][resource] = projected_start_time
 
@@ -88,7 +87,12 @@ def cxTwoPointCopy(ind1, ind2):
 
 
 def evaluate(individual):
-    return sum(individual),
+    max_time = -1
+    for consumer in range(0, individual.shape[0]):
+        for resource in range(0, individual.shape[1]):
+            if individual[consumer, resource] + NEWS_READERS[consumer][resource] > max_time:
+                max_time = individual[consumer, resource] + NEWS_READERS[consumer][resource]
+    return max_time,
 
 
 def main():
