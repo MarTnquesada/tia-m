@@ -21,7 +21,52 @@ NEWS_READERS = [[10, 15, 25, 12, 22, 66, 25, 35, 50, 12],
                 [15, 18, 22, 55, 10, 20, 20, 22, 30, 22],
                 [70, 30, 12, 18, 12, 20, 21, 12, 40, 30],
                 [15, 15, 40, 20, 15, 15, 30, 6, 20, 15]]
-MAX_TIME = sum(sum(reader) for reader in NEWS_READERS)
+
+
+def generate_individual_from_ro(relative_order):
+    """
+    Each individual is represented by a list of readers, in which the position of each reader relates to its identity.
+    Every reader is represented by a sequence of newspapers, where the position of each one corresponds with its
+    identity, and their values tell which is the starting time of reading for that newspaper and reader
+    :param relative_order:
+    :return:
+    """
+    shape = relative_order.shape
+    individual = numpy.full((shape[0], shape[1]), numpy.nan)
+    # create final timeline, randomizing initial priority
+    for order in range(0, shape[1]):
+        for consumer in numpy.random.permutation([c for c in range(0, shape[0])]):
+            resource = relative_order[consumer][order]
+            previous_resource = None
+            if order > 0:
+                previous_resource = relative_order[consumer][order - 1]
+
+            projected_start_time = 0 if previous_resource is None else individual[consumer][previous_resource] + NEWS_READERS[consumer][previous_resource]
+            projected_end_time = projected_start_time + NEWS_READERS[consumer][resource]
+            while True:
+                search_conflict = False
+                for c2 in range(0, shape[0]):
+                    if not numpy.isnan(individual[c2][resource]):
+                        if individual[c2][resource] <= projected_start_time < individual[c2][resource] + NEWS_READERS[c2][resource] or \
+                                individual[c2][resource] < projected_end_time <= individual[c2][resource] + NEWS_READERS[c2][resource] or \
+                                individual[c2][resource] >= projected_start_time and projected_end_time >= individual[c2][resource] + NEWS_READERS[c2][resource]:
+                            projected_start_time = individual[c2][resource] + NEWS_READERS[c2][resource]
+                            search_conflict = True
+                            break
+                if not search_conflict:
+                    break
+
+            individual[consumer][resource] = projected_start_time
+
+    return individual
+
+
+def get_individual_ro(individual):
+    relative_order = numpy.full((individual.shape[0], individual.shape[1]), -1, dtype=int)
+    for consumer in range(0, individual.shape[0]):
+        sorted_consumer = sorted(individual[consumer])
+        relative_order[consumer] = [sorted_consumer.index(individual[consumer][i]) for i in range(0, individual.shape[1])]
+    return relative_order
 
 
 def init_individual(icls, shape):
@@ -33,27 +78,8 @@ def init_individual(icls, shape):
     :param shape:
     :return:
     """
-
     relative_order = numpy.array([numpy.random.permutation(range(0, shape[1])) for i in range(0, shape[0])])
-    individual = numpy.full((shape[0], shape[1]), numpy.NINF, dtype=int)
-    # create final timeline, randomizing initial priority
-    for order in numpy.random.permutation([r for r in range(0, shape[1])]):
-        for consumer in numpy.random.permutation([c for c in range(0, shape[0])]):
-            resource = relative_order[consumer][order]
-            previous_resource = None
-            if order > 0:
-                previous_resource = relative_order[consumer][order - 1]
-
-            projected_start_time = 0 if previous_resource is None else individual[consumer][previous_resource] + NEWS_READERS[consumer][previous_resource]
-            projected_end_time = projected_start_time + NEWS_READERS[consumer][resource]
-            for c2 in range(0, shape[0]):
-                if individual[c2][resource] <= projected_start_time < individual[c2][resource] + NEWS_READERS[c2][resource] or \
-                        individual[c2][resource] < projected_end_time <= individual[c2][resource] + NEWS_READERS[c2][resource] or \
-                        individual[c2][resource] >= projected_start_time and projected_end_time >= individual[c2][resource] + NEWS_READERS[c2][resource]:
-                    projected_start_time = individual[c2][resource] + NEWS_READERS[c2][resource]
-
-            individual[consumer][resource] = projected_start_time
-
+    individual = generate_individual_from_ro(relative_order)
     return icls(individual)
 
 
@@ -84,6 +110,10 @@ def cxTwoPointCopy(ind1, ind2):
         = ind2[cxpoint1:cxpoint2].copy(), ind1[cxpoint1:cxpoint2].copy()
 
     return ind1, ind2
+
+
+def mutate(individual):
+    return individual
 
 
 def evaluate(individual):
@@ -128,6 +158,8 @@ def main():
     # create an initial population
     pop = toolbox.population(n=args.population_size)
     history.update(pop)
+    p = pop[0]
+    s = get_individual_ro(pop[0])
     # create a list of statistics to be retrieved during the evolution process (they are shown in the logbook)
     stats = tools.Statistics()
     stats.register('min', min)
