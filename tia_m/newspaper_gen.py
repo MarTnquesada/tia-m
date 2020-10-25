@@ -3,7 +3,7 @@ import random
 from deap import base, creator, tools, algorithms
 import numpy
 import matplotlib.pyplot as plt
-import networkx
+
 
 """
 NEWS READERS MATRIX
@@ -21,6 +21,10 @@ NEWS_READERS = [[10, 15, 25, 12, 22, 66, 25, 35, 50, 12],
                 [15, 18, 22, 55, 10, 20, 20, 22, 30, 22],
                 [70, 30, 12, 18, 12, 20, 21, 12, 40, 30],
                 [15, 15, 40, 20, 15, 15, 30, 6, 20, 15]]
+
+
+def overlap(a, b):
+    return max(0, min(a[1], b[1]) - max(a[0], b[0]))
 
 
 def generate_individual_from_ro(relative_order):
@@ -47,10 +51,9 @@ def generate_individual_from_ro(relative_order):
                 search_conflict = False
                 for c2 in range(0, shape[0]):
                     if not numpy.isnan(individual[c2][resource]):
-                        if individual[c2][resource] <= projected_start_time < individual[c2][resource] + NEWS_READERS[c2][resource] or \
-                                individual[c2][resource] < projected_end_time <= individual[c2][resource] + NEWS_READERS[c2][resource] or \
-                                individual[c2][resource] >= projected_start_time and projected_end_time >= individual[c2][resource] + NEWS_READERS[c2][resource]:
+                        if overlap([projected_start_time, projected_end_time], [individual[c2][resource], individual[c2][resource] + NEWS_READERS[c2][resource]]) > 0:
                             projected_start_time = individual[c2][resource] + NEWS_READERS[c2][resource]
+                            projected_end_time = projected_start_time + NEWS_READERS[consumer][resource]
                             search_conflict = True
                             break
                 if not search_conflict:
@@ -58,7 +61,7 @@ def generate_individual_from_ro(relative_order):
 
             individual[consumer][resource] = projected_start_time
 
-    return individual
+    return individual.astype(int)
 
 
 def get_individual_ro(individual):
@@ -98,29 +101,42 @@ def cxTwoPointCopy(ind1, ind2):
         >>> print(b)
         [5 6 7 8]
     """
-    size = len(ind1)
-    cxpoint1 = random.randint(1, size)
-    cxpoint2 = random.randint(1, size - 1)
+    ro1 = get_individual_ro(ind1)
+    ro2 = get_individual_ro(ind2)
+
+    size = len(ro1)
+    cxpoint1 = random.randint(0, size - 1)
+    cxpoint2 = random.randint(1, size - 2)
     if cxpoint2 >= cxpoint1:
         cxpoint2 += 1
     else:  # Swap the two cx points
         cxpoint1, cxpoint2 = cxpoint2, cxpoint1
-
-    ind1[cxpoint1:cxpoint2], ind2[cxpoint1:cxpoint2] \
-        = ind2[cxpoint1:cxpoint2].copy(), ind1[cxpoint1:cxpoint2].copy()
-
+    # crossover
+    ro1[cxpoint1:cxpoint2], ro2[cxpoint1:cxpoint2] \
+        = ro2[cxpoint1:cxpoint2].copy(), ro1[cxpoint1:cxpoint2].copy()
+    # regenerate individuals from relative orders
+    ind1[:], ind2[:] = generate_individual_from_ro(ro1)[:].copy(), generate_individual_from_ro(ro2)[:].copy()
     return ind1, ind2
 
 
 def mutate(individual):
-    return individual
+    consumer = random.randint(0, len(individual) - 1)
+    size = len(individual[consumer])
+    randpos1 = random.randint(0, size - 1)
+    randpos2 = random.randint(0, size - 1)
+    if size > 1:
+        while randpos1 == randpos2:
+            randpos2 = random.randint(0, size - 1)
+    individual[consumer][randpos1], individual[consumer][randpos2] = \
+        individual[consumer][randpos2].copy(), individual[consumer][randpos1].copy()
+    return individual,
 
 
 def evaluate(individual):
     max_time = -1
     for consumer in range(0, individual.shape[0]):
         for resource in range(0, individual.shape[1]):
-            if individual[consumer, resource] + NEWS_READERS[consumer][resource] > max_time:
+            if individual[consumer][resource] + NEWS_READERS[consumer][resource] > max_time:
                 max_time = individual[consumer, resource] + NEWS_READERS[consumer][resource]
     return max_time,
 
@@ -128,7 +144,7 @@ def evaluate(individual):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--population_size', default=50)
-    parser.add_argument('--hof_size', default=1)
+    parser.add_argument('--hof_size', default=5)
     parser.add_argument('--ngen', default=40)
     parser.add_argument('--mutpb', default=0.2)
     parser.add_argument('--cxpb', default=0.5)
@@ -145,24 +161,24 @@ def main():
 
     # initialize operators and evaluation function
     toolbox.register("mate", cxTwoPointCopy)
-    toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
+    toolbox.register("mutate", mutate)
     toolbox.register("select", tools.selTournament, tournsize=3)
     toolbox.register("evaluate", evaluate)
 
     # create history object, which is used to get nice prints of the overall evolution process
     history = tools.History()
     # decorate the variation operator so that they can be used to retrieve a history
-    toolbox.decorate("mate", history.decorator)
-    toolbox.decorate("mutate", history.decorator)
+    # TODO history also presents conflicts with np.array
+    # toolbox.decorate("mate", history.decorator)
+    # toolbox.decorate("mutate", history.decorator)
 
     # create an initial population
     pop = toolbox.population(n=args.population_size)
     history.update(pop)
-    p = pop[0]
-    s = get_individual_ro(pop[0])
     # create a list of statistics to be retrieved during the evolution process (they are shown in the logbook)
     stats = tools.Statistics()
-    stats.register('min', min)
+    # TODO change min function to accomodate to the 2-dimensional np.array
+    stats.register('min', lambda x: min(evaluate(ind) for ind in x))
     # create a hall of fame, which contains the best individual/s that ever lived in the population during the evolution
     hof = tools.HallOfFame(maxsize=args.hof_size, similar=numpy.array_equal)
 
