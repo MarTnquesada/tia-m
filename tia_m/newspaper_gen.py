@@ -4,7 +4,6 @@ from deap import base, creator, tools, algorithms
 import numpy
 import matplotlib.pyplot as plt
 
-
 """
 NEWS READERS MATRIX
 - each row corresponds with a reader (row 0 with reader 1 and so on)
