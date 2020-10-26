@@ -1,7 +1,8 @@
 import argparse
 import numpy
+import random
 import matplotlib.pyplot as plt
-from tia_m.newspaper_gen import generate_individual_from_ro, evaluate
+from tia_m.newspaper_gen import generate_individual_from_ro
 
 
 """
@@ -22,7 +23,7 @@ NEWS_READERS = [[10, 15, 25, 12, 22, 66, 25, 35, 50, 12],
                 [15, 15, 40, 20, 15, 15, 30, 6, 20, 15]]
 
 
-def random_start(shape=(10, 10)):
+def random_state(shape=(10, 10)):
     relative_order = numpy.array([numpy.random.permutation(range(0, shape[1])) for i in range(0, shape[0])])
     state = generate_individual_from_ro(relative_order)
     return state
@@ -37,49 +38,73 @@ def cost_function(state):
     return max_time
 
 
-def plot_annealing(states, costs):
+def get_random_neighbour(state):
+    consumer = random.randint(0, len(state) - 1)
+    size = len(state[consumer])
+    randpos1 = random.randint(0, size - 1)
+    randpos2 = random.randint(0, size - 1)
+    if size > 1:
+        while randpos1 == randpos2:
+            randpos2 = random.randint(0, size - 1)
+    new_state = state.copy()
+    new_state[consumer][randpos1], new_state[consumer][randpos2] = \
+        new_state[consumer][randpos2].copy(), new_state[consumer][randpos1].copy()
+    return new_state
+
+
+def annealing(initial_t, annealing_type, t_annealing_constant, maxsteps=1000):
+    t = initial_t
+    state = random_state()
+    best_state = state
+    cost = cost_function(state)
+    states, costs = [state], [cost]
+    for step in range(maxsteps):
+        if annealing_type == 'lineal':
+            t = initial_t - step * t_annealing_constant
+        elif annealing_type == 'lineal':
+            t = t * t_annealing_constant
+        elif annealing_type == 'exponential':
+            t = t / (1 + t * t_annealing_constant)
+        else:
+            print('Error, no correct annealing type selected')
+            return None
+        new_state = get_random_neighbour(state)
+        new_cost = cost_function(new_state)
+        cost_delta = cost - new_cost
+        if cost_delta > 0:
+            if cost_function(best_state) > cost_function(new_state):
+                best_state = new_state
+            state, cost = new_state, new_cost
+            states.append(state)
+            costs.append(cost)
+        else:
+            if numpy.exp(- (new_cost - cost) / t) > numpy.random.random():
+                state, cost = new_state, new_cost
+                states.append(state)
+                costs.append(cost)
+    return best_state, cost_function(best_state), states, costs
+
+
+def plot_annealing(costs):
     plt.figure()
-    plt.suptitle("Evolution of states and costs of the simulated annealing")
-    plt.subplot(121)
-    plt.plot(states, 'r')
-    plt.title("States")
+    plt.suptitle("Evolution of costs of the simulated annealing")
     plt.subplot(122)
-    plt.plot(costs, 'b')
+    plt.plot(costs, 'a')
     plt.title("Costs")
     plt.show()
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--population_size', default=50)
-    parser.add_argument('--hof_size', default=5)
-    parser.add_argument('--ngen', default=40)
-    parser.add_argument('--mutpb', default=0.2)
-    parser.add_argument('--cxpb', default=0.5)
+    parser.add_argument('--initial_t', default=50)
+    parser.add_argument('--annealing_type', default='lineal', choices=['lineal', 'multiplicative', 'exponential'])
+    parser.add_argument('--t_annealing_constant', default=0.05, help='Range: [0, 1]')
+    parser.add_argument('--maxsteps', default=1000)
     args = parser.parse_args()
 
-
-    def annealing(random_start, cost_function, random_neighbour, acceptance, temperature, maxsteps=1000, debug=True):
-        """ Optimize the black-box function 'cost_function' with the simulated annealing algorithm."""
-        state = random_start()
-        cost = cost_function(state)
-        states, costs = [state], [cost]
-        for step in range(maxsteps):
-            fraction = step / float(maxsteps)
-            T = temperature(fraction)
-            new_state = random_neighbour(state, fraction)
-            new_cost = cost_function(new_state)
-            if debug: print(
-                "Step #{:>2}/{:>2} : T = {:>4.3g}, state = {:>4.3g}, cost = {:>4.3g}, new_state = {:>4.3g}, new_cost = {:>4.3g} ...".format(
-                    step, maxsteps, T, state, cost, new_state, new_cost))
-            if get_acceptance_probability(cost, new_cost, T) > rn.random():
-                state, cost = new_state, new_cost
-                states.append(state)
-                costs.append(cost)
-                # print("  ==> Accept it!")
-            # else:
-            #    print("  ==> Reject it...")
-        return state, cost_function(state), states, costs
+    best_state, best_state_cost, states, costs = annealing(args.initial_t, args.annealing_type,
+                                                           args.t_annealing_constant, args.maxsteps)
+    plot_annealing(costs)
 
 
 if __name__ == '__main__':
