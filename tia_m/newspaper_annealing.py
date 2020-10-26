@@ -39,6 +39,7 @@ def cost_function(state):
 
 
 def get_random_neighbour(state):
+    # TODO improve random neighbour to obtain more variance
     consumer = random.randint(0, len(state) - 1)
     size = len(state[consumer])
     randpos1 = random.randint(0, size - 1)
@@ -60,8 +61,9 @@ def annealing(initial_t, annealing_type, t_annealing_constant, maxsteps=1000):
     states, costs = [state], [cost]
     for step in range(maxsteps):
         if annealing_type == 'lineal':
-            t = initial_t - step * t_annealing_constant
-        elif annealing_type == 'lineal':
+            # TODO t is too big
+            t = initial_t - step * 10 * t_annealing_constant
+        elif annealing_type == 'multiplicative':
             t = t * t_annealing_constant
         elif annealing_type == 'exponential':
             t = t / (1 + t * t_annealing_constant)
@@ -78,7 +80,7 @@ def annealing(initial_t, annealing_type, t_annealing_constant, maxsteps=1000):
             states.append(state)
             costs.append(cost)
         else:
-            if numpy.exp(- (new_cost - cost) / t) > numpy.random.random():
+            if numpy.exp(cost_delta / t) > numpy.random.random():
                 state, cost = new_state, new_cost
                 states.append(state)
                 costs.append(cost)
@@ -89,7 +91,7 @@ def plot_annealing(costs):
     plt.figure()
     plt.suptitle("Evolution of costs of the simulated annealing")
     plt.subplot(122)
-    plt.plot(costs, 'a')
+    plt.plot(costs, 'red')
     plt.title("Costs")
     plt.show()
 
@@ -97,13 +99,14 @@ def plot_annealing(costs):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--initial_t', default=50)
-    parser.add_argument('--annealing_type', default='lineal', choices=['lineal', 'multiplicative', 'exponential'])
-    parser.add_argument('--t_annealing_constant', default=0.05, help='Range: [0, 1]')
+    parser.add_argument('--annealing_type', default='exponential', choices=['lineal', 'multiplicative', 'exponential'])
+    parser.add_argument('--t_annealing_constant', default=0.001, help='Range: [0, 1]')
     parser.add_argument('--maxsteps', default=1000)
     args = parser.parse_args()
 
     best_state, best_state_cost, states, costs = annealing(args.initial_t, args.annealing_type,
                                                            args.t_annealing_constant, args.maxsteps)
+    print(best_state_cost)
     plot_annealing(costs)
 
 
