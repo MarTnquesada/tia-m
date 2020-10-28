@@ -62,7 +62,10 @@ def annealing(initial_t, annealing_type, t_annealing_constant, maxsteps=1000):
     for step in range(maxsteps):
         if annealing_type == 'lineal':
             # TODO t is too big
-            t = initial_t - step * 10 * t_annealing_constant
+            t = initial_t - step * t_annealing_constant
+            print(t)
+            if t <= 0:
+                t = 0.1
         elif annealing_type == 'multiplicative':
             t = t * t_annealing_constant
         elif annealing_type == 'exponential':
@@ -87,27 +90,27 @@ def annealing(initial_t, annealing_type, t_annealing_constant, maxsteps=1000):
     return best_state, cost_function(best_state), states, costs
 
 
-def plot_annealing(costs):
-    plt.figure()
-    plt.suptitle("Evolution of costs of the simulated annealing")
-    plt.subplot(122)
+def plot_annealing(costs, title):
     plt.plot(costs, 'red')
-    plt.title("Costs")
+    plt.xlabel('Iteration')
+    plt.ylabel('Cost (total reading time)')
+    plt.title(title)
+    #plt.legend(descriptor_freqs_nm)
     plt.show()
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--initial_t', default=50)
-    parser.add_argument('--annealing_type', default='exponential', choices=['lineal', 'multiplicative', 'exponential'])
-    parser.add_argument('--t_annealing_constant', default=0.001, help='Range: [0, 1]')
+    parser.add_argument('--annealing_type', default='lineal', choices=['lineal', 'multiplicative', 'exponential'])
+    parser.add_argument('--t_annealing_constant', default=0.5, help='Range: [0, 1]')
     parser.add_argument('--maxsteps', default=1000)
     args = parser.parse_args()
 
     best_state, best_state_cost, states, costs = annealing(args.initial_t, args.annealing_type,
                                                            args.t_annealing_constant, args.maxsteps)
     print(best_state_cost)
-    plot_annealing(costs)
+    plot_annealing(costs, f'{args.annealing_type.capitalize()} annealing; Ti={args.initial_t}, k={args.t_annealing_constant}; maxsteps={args.maxsteps}')
 
 
 if __name__ == '__main__':

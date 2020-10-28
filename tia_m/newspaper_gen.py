@@ -140,6 +140,14 @@ def evaluate(individual):
     return max_time,
 
 
+def plot_genetic(logbook):
+    plt.plot([stat['min'][0] for stat in logbook], 'red')
+    plt.xlabel('Generation')
+    plt.ylabel('Best individual total reading time')
+    #plt.legend(descriptor_freqs_nm)
+    plt.show()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--population_size', default=50)
@@ -197,6 +205,8 @@ def main():
     print(hof[0])
     print('\nEVALUATION')
     print(evaluate(hof[0]))
+
+    plot_genetic(logbook)
 
 
 if __name__ == '__main__':
